@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ghost Browser | UV Powered</title>
+    <style>
+        :root {
+            --bg: #121212; --surface: #1e1e1e; --surface-hover: #2d2d2d;
+            --primary: #ff5722; --primary-hover: #e64a19;
+            --text: #ffffff; --text-dim: #a0a0a0; --border: #333333;
+        }
+        body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; display: flex; flex-direction: column; height: 100vh; background-color: var(--bg); color: var(--text); overflow: hidden; }
+        
+        #tab-bar { display: flex; background-color: #080808; padding: 8px 8px 0 8px; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--border); }
+        #tab-bar::-webkit-scrollbar { display: none; }
+        .tab { background-color: var(--surface); color: var(--text-dim); padding: 10px 20px; margin-right: 6px; border-radius: 10px 10px 0 0; cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-size: 13px; min-width: 120px; max-width: 220px; transition: background 0.2s; border: 1px solid transparent; border-bottom: none; user-select: none; }
+        .tab:hover { background-color: var(--surface-hover); }
+        .tab.active { background-color: var(--bg); color: var(--text); font-weight: 600; border-color: var(--border); }
+        .tab-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-grow: 1; pointer-events: none; }
+        .tab-close { margin-left: 10px; background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 14px; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+        .tab-close:hover { background-color: rgba(255,255,255,0.1); color: var(--text); }
+        #new-tab-btn { background: none; border: none; color: var(--text-dim); font-size: 22px; cursor: pointer; padding: 0 15px; border-radius: 8px; transition: 0.2s; }
+        #new-tab-btn:hover { color: var(--text); background-color: rgba(255,255,255,0.05); }
+
+        #nav-bar { display: flex; align-items: center; background-color: var(--bg); padding: 10px 15px; border-bottom: 1px solid var(--border); gap: 15px; }
+        .nav-btn { background: none; border: none; color: var(--text-dim); font-size: 18px; cursor: pointer; transition: color 0.2s; display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; }
+        .nav-btn:hover { color: var(--text); background-color: var(--surface); }
+        #address-bar { flex-grow: 1; background-color: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 10px 20px; border-radius: 20px; font-size: 14px; outline: none; transition: 0.2s; box-shadow: inset 0 1px 3px rgba(0,0,0,0.5); }
+        #address-bar:focus { border-color: var(--primary); background-color: #1a1a1a; }
+        
+        #js-btn { position: fixed; bottom: 25px; right: 25px; background-color: var(--primary); color: white; border: none; border-radius: 50%; width: 55px; height: 55px; font-weight: bold; cursor: pointer; font-size: 20px; transition: 0.2s; box-shadow: 0 4px 15px rgba(255, 87, 34, 0.4); z-index: 1001; display: flex; align-items: center; justify-content: center; font-family: monospace; }
+        #js-btn:hover { background-color: var(--primary-hover); transform: scale(1.05); }
+
+        #bookmarks-bar { display: flex; background-color: var(--surface); padding: 6px 15px; gap: 15px; border-bottom: 1px solid var(--border); overflow-x: auto; font-size: 12px; scrollbar-width: none; }
+        #bookmarks-bar::-webkit-scrollbar { display: none; }
+        .bookmark-item { color: var(--text-dim); cursor: pointer; text-decoration: none; white-space: nowrap; transition: color 0.2s; }
+        .bookmark-item:hover { color: var(--primary); text-decoration: underline; }
+
+        #iframe-container { flex-grow: 1; position: relative; background: #ffffff; }
+        .browser-frame { width: 100%; height: 100%; border: none; position: absolute; top: 0; left: 0; display: none; background-color: #fff; }
+        .browser-frame.active { display: block; }
+
+        #internal-page-container { flex-grow: 1; background: var(--bg); display: none; padding: 30px; overflow-y: auto; color: var(--text); box-sizing: border-box; }
+        .internal-box { background: var(--surface); padding: 20px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 20px; }
+        .internal-box h2 { margin-top: 0; color: var(--primary); }
+        .internal-list-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid var(--border); }
+        .internal-list-item:last-child { border-bottom: none; }
+        .action-btn { background: var(--primary); color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 12px; margin-left: 5px; }
+        .action-btn.delete { background: #d32f2f; }
+        .input-field { background: var(--bg); color: var(--text); border: 1px solid var(--border); padding: 8px; border-radius: 5px; margin-right: 10px; outline: none; }
+
+        #js-modal { display: none; position: fixed; bottom: 90px; right: 25px; width: 380px; background: rgba(30, 30, 30, 0.95); backdrop-filter: blur(10px); border-radius: 12px; padding: 20px; z-index: 1000; box-shadow: 0 10px 30px rgba(0,0,0,0.8); border: 1px solid var(--border); }
+        #js-modal h3 { margin-top: 0; margin-bottom: 15px; color: var(--text); font-size: 16px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+        textarea { width: 100%; height: 120px; box-sizing: border-box; background: #0d0d0d; color: #4af626; border: 1px solid var(--border); border-radius: 8px; padding: 12px; font-family: 'Courier New', Courier, monospace; margin-bottom: 15px; resize: none; outline: none; }
+        textarea:focus { border-color: var(--primary); }
+        .save-btn { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; cursor: pointer; border-radius: 8px; font-weight: bold; transition: 0.2s; }
+        .save-btn:hover { background: var(--primary-hover); }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@titaniumnetwork-dev/ultraviolet@2.0.0/dist/uv.bundle.js"></script>
+    <script src="/public/uv.config.js"></script>
+</head>
+<body>
+
+    <div id="tab-bar"><button id="new-tab-btn">+</button></div>
+    <div id="nav-bar">
+        <button class="nav-btn" onclick="goBack()" title="Back">◀</button>
+        <button class="nav-btn" onclick="goForward()" title="Forward">▶</button>
+        <button class="nav-btn" onclick="reloadFrame()" title="Reload">↻</button>
+        <input type="text" id="address-bar" placeholder="Search DuckDuckGo, enter URL, or type uv://...">
+    </div>
+    <div id="bookmarks-bar"></div>
+    <div id="iframe-container"></div>
+    <div id="internal-page-container"></div>
+
+    <button id="js-btn">&lt;&gt;</button>
+
+    <div id="js-modal">
+        <h3>⚡ Inject Custom JS</h3>
+        <textarea id="js-input" placeholder="// Write your JavaScript here...&#10;alert('Ghost Browser Initialized!');"></textarea>
+        <button id="save-js-btn" class="save-btn">Save & Inject</button>
+    </div>
+
+    <script>
+        let tabCount = 0;
+        let activeTabId = null;
+        let tabData = {}; 
+
+        let savedScripts = JSON.parse(localStorage.getItem('ghost_scripts') || '{}');
+        let bookmarks = JSON.parse(localStorage.getItem('ghost_bookmarks') || '[]');
+        let passwords = JSON.parse(localStorage.getItem('ghost_passwords') || '{}');
+
+        // UPDATED PATH HERE
+        navigator.serviceWorker.register('/public/sw.js', { scope: '/' }).then(() => {
+            pushScriptsToSW(); 
+        });
+
+        function pushScriptsToSW() {
+            let scriptsToInject = Object.values(savedScripts);
+            
+            if (Object.keys(passwords).length > 0) {
+                const autoFillScript = `
+                    (function() {
+                        const pwds = ${JSON.stringify(passwords)};
+                        
+                        function triggerInput(el, val) {
+                            el.value = val;
+                            el.dispatchEvent(new Event('input', { bubbles: true }));
+                            el.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+
+                        function attemptFill() {
+                            const currentHost = window.location.hostname;
+                            const siteKeys = Object.keys(pwds);
+                            const match = siteKeys.find(key => currentHost.includes(key));
+                            
+                            if(match) {
+                                const userFields = document.querySelectorAll('input[type="text"], input[type="email"], input[name*="user"], input[name*="login"], input[id*="user"]');
+                                const passFields = document.querySelectorAll('input[type="password"]');
+                                
+                                if(passFields.length > 0 && !passFields[0].dataset.filled) {
+                                    triggerInput(passFields[0], pwds[match].pass);
+                                    passFields[0].dataset.filled = "true";
+                                    
+                                    if(userFields.length > 0) {
+                                        triggerInput(userFields[userFields.length-1], pwds[match].user);
+                                    }
+                                }
+                            }
+                        }
+
+                        window.addEventListener('load', () => {
+                            setTimeout(attemptFill, 500);
+                            setTimeout(attemptFill, 1500); 
+                            
+                            const observer = new MutationObserver(() => attemptFill());
+                            observer.observe(document.body, { childList: true, subtree: true });
+                            setTimeout(() => observer.disconnect(), 5000); 
+                        });
+                    })();
+                `;
+                scriptsToInject.push(autoFillScript);
+            }
+
+            if (navigator.serviceWorker.controller) {
+                navigator.serviceWorker.controller.postMessage({
+                    type: 'UPDATE_SCRIPTS',
+                    scripts: scriptsToInject 
+                });
+            }
+        }
+
+        function renderBookmarks() {
+            const bar = document.getElementById('bookmarks-bar');
+            bar.innerHTML = '';
+            bookmarks.forEach((bm, index) => {
+                const el = document.createElement('a');
+                el.className = 'bookmark-item';
+                el.innerText = bm.name;
+                el.onclick = () => loadUrl(bm.url);
+                el.oncontextmenu = (e) => { 
+                    e.preventDefault(); 
+                    if(confirm(`Delete bookmark "${bm.name}"?`)) {
+                        bookmarks.splice(index, 1);
+                        localStorage.setItem('ghost_bookmarks', JSON.stringify(bookmarks));
+                        renderBookmarks();
+                    }
+                };
+                bar.appendChild(el);
+            });
+        }
+        renderBookmarks();
+
+        function createTab(url = '') {
+            tabCount++;
+            const tabId = 'tab-' + tabCount;
+            tabData[tabId] = { url: '' };
+            
+            const tabBtn = document.createElement('div');
+            tabBtn.className = 'tab';
+            tabBtn.id = 'btn-' + tabId;
+            tabBtn.innerHTML = `<span class="tab-title">New Tab</span> <button class="tab-close" onclick="closeTab('${tabId}', event)">✕</button>`;
+            
+            tabBtn.onclick = () => switchTab(tabId);
+            tabBtn.ondblclick = () => {
+                const currentUrl = tabData[tabId].url;
+                if (currentUrl && !currentUrl.startsWith('uv://')) {
+                    const name = prompt("Name this bookmark:", currentUrl.split('/')[2] || "My Bookmark");
+                    if (name) {
+                        bookmarks.push({ name, url: currentUrl });
+                        localStorage.setItem('ghost_bookmarks', JSON.stringify(bookmarks));
+                        renderBookmarks();
+                    }
+                }
+            };
+
+            document.getElementById('new-tab-btn').before(tabBtn);
+
+            const iframe = document.createElement('iframe');
+            iframe.className = 'browser-frame';
+            iframe.id = 'frame-' + tabId;
+            iframe.setAttribute('allowfullscreen', 'true');
+            iframe.onload = pushScriptsToSW; 
+            
+            document.getElementById('iframe-container').appendChild(iframe);
+
+            switchTab(tabId);
+            if (url) loadUrl(url);
+            
+            document.getElementById('address-bar').focus();
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.browser-frame').forEach(f => f.classList.remove('active'));
+
+            document.getElementById('btn-' + tabId).classList.add('active');
+            activeTabId = tabId;
+            document.getElementById('address-bar').value = tabData[tabId].url;
+            
+            if (tabData[tabId].url.startsWith('uv://')) {
+                document.getElementById('iframe-container').style.display = 'none';
+                document.getElementById('internal-page-container').style.display = 'block';
+                renderInternalPage(tabData[tabId].url);
+            } else {
+                document.getElementById('iframe-container').style.display = 'flex';
+                document.getElementById('internal-page-container').style.display = 'none';
+                document.getElementById('frame-' + tabId).classList.add('active');
+            }
+        }
+
+        function closeTab(tabId, event) {
+            event.stopPropagation();
+            document.getElementById('btn-' + tabId).remove();
+            document.getElementById('frame-' + tabId).remove();
+            delete tabData[tabId];
+            
+            if (activeTabId === tabId) {
+                const remainingTabs = document.querySelectorAll('.tab');
+                if (remainingTabs.length > 0) {
+                    switchTab(remainingTabs[remainingTabs.length - 1].id.replace('btn-', ''));
+                } else {
+                    activeTabId = null;
+                    document.getElementById('address-bar').value = '';
+                    createTab(); 
+                }
+            }
+        }
+
+        function loadUrl(input) {
+            if (!activeTabId) createTab();
+            
+            let finalUrl = input.trim();
+            tabData[activeTabId].url = finalUrl;
+            document.getElementById('address-bar').value = finalUrl;
+
+            const tabTitle = document.getElementById('btn-' + activeTabId).querySelector('.tab-title');
+            
+            if (finalUrl.startsWith('uv://')) {
+                tabTitle.innerText = finalUrl;
+                switchTab(activeTabId); 
+                return;
+            }
+
+            document.getElementById('iframe-container').style.display = 'flex';
+            document.getElementById('internal-page-container').style.display = 'none';
+
+            if (finalUrl.includes(' ') || (!finalUrl.includes('.') && !finalUrl.startsWith('http'))) {
+                finalUrl = 'https://duckduckgo.com/?q=' + encodeURIComponent(finalUrl);
+            } else if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
+                finalUrl = 'https://' + finalUrl;
+            }
+            
+            tabTitle.innerText = finalUrl;
+            const frame = document.getElementById('frame-' + activeTabId);
+            const encodedUrl = __uv$config.encodeUrl(finalUrl);
+            frame.src = __uv$config.prefix + encodedUrl;
+            
+            document.getElementById('address-bar').blur();
+        }
+
+        document.getElementById('address-bar').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') loadUrl(this.value);
+        });
+
+        document.getElementById('new-tab-btn').addEventListener('click', () => createTab());
+
+        function goBack() { document.getElementById('frame-' + activeTabId)?.contentWindow.history.back(); }
+        function goForward() { document.getElementById('frame-' + activeTabId)?.contentWindow.history.forward(); }
+        function reloadFrame() { 
+            if(tabData[activeTabId].url.startsWith('uv://')) {
+                renderInternalPage(tabData[activeTabId].url);
+            } else {
+                const frame = document.getElementById('frame-' + activeTabId);
+                if(frame) frame.src = frame.src; 
+            }
+        }
+
+        const jsBtn = document.getElementById('js-btn');
+        const jsModal = document.getElementById('js-modal');
+        const saveJsBtn = document.getElementById('save-js-btn');
+        const jsInput = document.getElementById('js-input');
+
+        jsBtn.onclick = () => {
+            jsModal.style.display = jsModal.style.display === 'block' ? 'none' : 'block';
+        };
+
+        document.addEventListener('click', (e) => {
+            if (!jsModal.contains(e.target) && e.target !== jsBtn) {
+                jsModal.style.display = 'none';
+            }
+        });
+
+        saveJsBtn.onclick = () => {
+            const code = jsInput.value.trim();
+            if (code) {
+                const name = prompt("Name this JavaFunction payload:", "MyScript");
+                if (name) {
+                    savedScripts[name] = code;
+                    localStorage.setItem('ghost_scripts', JSON.stringify(savedScripts));
+                    pushScriptsToSW();
+                    jsBtn.innerHTML = "✓";
+                    setTimeout(() => jsBtn.innerHTML = "&lt;&gt;", 2000);
+                    if(tabData[activeTabId]?.url === 'uv://javafunction') renderInternalPage('uv://javafunction');
+                }
+            }
+        };
+
+        function renderInternalPage(url) {
+            const container = document.getElementById('internal-page-container');
+            container.innerHTML = ''; 
+
+            if (url === 'uv://javafunction') {
+                container.innerHTML = `<div class="internal-box"><h2>⚡ Saved JavaFunctions</h2><div id="script-list"></div></div>`;
+                const list = document.getElementById('script-list');
+                
+                if(Object.keys(savedScripts).length === 0) list.innerHTML = "<p>No saved scripts. Use the <> button to add some!</p>";
+                
+                for (const [name, code] of Object.entries(savedScripts)) {
+                    const item = document.createElement('div');
+                    item.className = 'internal-list-item';
+                    item.innerHTML = `<strong>${name}</strong> 
+                        <div>
+                            <button class="action-btn" onclick="editScript('${name}')">Edit</button>
+                            <button class="action-btn delete" onclick="deleteScript('${name}')">Delete</button>
+                        </div>`;
+                    list.appendChild(item);
+                }
+            } 
+            else if (url === 'uv://passwords') {
+                container.innerHTML = `
+                    <div class="internal-box">
+                        <h2>🔑 Password Auto-Injector</h2>
+                        <p style="color:#ff5722; font-size: 12px;">Warning: Stored locally in plain text. Do not use for highly sensitive accounts.</p>
+                        <div style="margin-bottom: 15px;">
+                            <input type="text" id="p-domain" cla
